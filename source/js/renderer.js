@@ -404,6 +404,15 @@ export default class Renderer
                 Math.round(scaledTile.scaleRatio * 100));
         }
 
+        if (sourceWidth == 0 || sourceHeight == 0) {
+        	console.error("source width or height is null! ", sourceWidth, sourceHeight);
+        	return;
+        }
+        if (destWidth == 0 || destHeight == 0) {
+        	console.error("destination width or height is null! ", destWidth, destHeight);
+        	return;
+        }
+        
         this._ctx.drawImage(
             img,
             sourceXOffset, sourceYOffset,
