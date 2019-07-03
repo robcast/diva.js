@@ -148,14 +148,25 @@ class Diva
         }
         else
         {
+            // trigger ManifestWillLoad event
+            diva.Events.publish('ManifestWillLoad', [this.settings], this);
+
+        	let requestHeaders =  {
+                    "Accept": this.settings.acceptHeader,
+            }
+        	if (this.settings.addRequestHeaders != null) 
+        	{
+        		Object.assign(requestHeaders, this.settings.addRequestHeaders);
+        	}
             const pendingManifestRequest = fetch(this.settings.objectData, {
-                headers: {
-                    "Accept": this.settings.acceptHeader
-                }
+                headers: requestHeaders
             }).then( (response) =>
             {
                 if (!response.ok)
                 {
+                    // trigger ManifestDidNotLoad event
+                    diva.Events.publish('ManifestDidNotLoad', [response], this);
+
                     this._ajaxError(response);
 
                     let error = new Error(response.statusText);

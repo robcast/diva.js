@@ -12,15 +12,20 @@
     <div id="diva-wrapper"></div>
     <!-- <div id="diva-wrapper2" style="width:40%; float: left;"></div> -->
     <script src="/build/diva.js"></script>
-    <script src="/build/plugins/download.js"></script>
+    <!-- <script src="/build/plugins/download.js"></script> -->
     <script src="/build/plugins/manipulation.js"></script>
     <script src="/build/plugins/metadata.js"></script>
+    <script src="/build/plugins/simple-auth.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function ()
         {
             diva = new Diva('diva-wrapper', {
-                objectData: "./test/manifests/iiifv3.json",
-                plugins: [Diva.DownloadPlugin, Diva.ManipulationPlugin, Diva.MetadataPlugin]
+            	simpleAuthTokenUrl: 'http://r583-1.mpiwg-berlin.mpg.de/auth/iiif-token',
+            	simpleAuthLoginUrl: 'http://r583-1.mpiwg-berlin.mpg.de/auth/iiif-login',
+            	objectData: 'http://r583-1.mpiwg-berlin.mpg.de/iiif/manifests/Landberg_1024.json',
+                plugins: [Diva.SimpleAuthPlugin, Diva.ManipulationPlugin, Diva.MetadataPlugin]
+                //objectData: "./test/manifests/iiifv3.json",
+                //plugins: [Diva.DownloadPlugin, Diva.ManipulationPlugin, Diva.MetadataPlugin]
             });
         }, false)
     </script>
