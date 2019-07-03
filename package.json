@@ -1,6 +1,6 @@
 {
-  "name": "diva",
-  "version": "6.0.0",
+  "name": "diva.js",
+  "version": "6.0.1",
   "description": "Diva.js",
   "main": "build/js/diva.js",
   "scripts": {
@@ -22,6 +22,8 @@
   "homepage": "https://github.com/DDMAL/diva.js#readme",
   "dependencies": {
     "array.prototype.fill": "^1.0.2",
+    "extend": "^3.0.2",
+    "lodash": ">=4.17.11",
     "url-search-params": "^1.0.2",
     "whatwg-fetch": "^2.0.4"
   },
@@ -41,7 +43,7 @@
     "istanbul-instrumenter-loader": "^3.0.1",
     "jshint": "^2.9.6",
     "jshint-stylish": "^2.2.1",
-    "karma": "^3.0.0",
+    "karma": "^4.0.1",
     "karma-babel-preprocessor": "^7.0.0",
     "karma-chrome-launcher": "^2.2.0",
     "karma-coverage-istanbul-reporter": "^2.0.2",
@@ -58,7 +60,7 @@
     "style-loader": "^0.23.0",
     "webpack": "^4.17.1",
     "webpack-cli": "^3.1.0",
-    "webpack-dev-server": "^3.1.7"
+    "webpack-dev-server": ">=3.1.11"
   },
   "divaOptions": {
     "mainEntry": "diva.js",

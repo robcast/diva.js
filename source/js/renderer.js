@@ -1,6 +1,3 @@
-const debug = require('debug')('diva:Renderer');
-const debugPaints = require('debug')('diva:Renderer:paints');
-
 import { elt, setAttributes } from './utils/elt';
 import CompositeImage from './composite-image';
 import DocumentLayout from './document-layout';
@@ -17,6 +14,7 @@ export default class Renderer
         this._viewport = options.viewport;
         this._outerElement = options.outerElement;
         this._documentElement = options.innerElement;
+        this._settings = options.settings;
 
         this._hooks = hooks || {};
 
@@ -74,15 +72,8 @@ export default class Renderer
 
         if (this._canvas.width !== this._viewport.width || this._canvas.height !== this._viewport.height)
         {
-            debug('Canvas dimension change: (%s, %s) -> (%s, %s)', this._canvas.width, this._canvas.height,
-                this._viewport.width, this._viewport.height);
-
             this._canvas.width = this._viewport.width;
             this._canvas.height = this._viewport.height;
-        }
-        else
-        {
-            debug('Reload, no size change');
         }
 
         // FIXME: What hooks should be called here?
@@ -203,11 +194,9 @@ export default class Renderer
 
     _paint ()
     {
-        debug('Repainting');
-
         const renderedTiles = [];
 
-        this._renderedPages.forEach(function (pageIndex)
+        this._renderedPages.forEach( (pageIndex) =>
         {
             this._compositeImages[pageIndex].getTiles(this._zoomLevel).forEach((source) =>
             {
@@ -218,8 +207,8 @@ export default class Renderer
                     renderedTiles.push(source.url);
                     this._drawTile(pageIndex, scaled, this._cache.get(source.url));
                 }
-            }, this);
-        }, this);
+            });
+        });
 
         const cache = this._cache;
 
@@ -251,31 +240,31 @@ export default class Renderer
     // Paint a page outline while the tiles are loading.
     _paintOutline (pages)
     {
-        pages.forEach(function (pageIndex)
+        pages.forEach( (pageIndex) =>
         {
-            const pageInfo = this.layout.getPageInfo(pageIndex);
-            const pageOffset = this._getImageOffset(pageIndex);
+            let pageInfo = this.layout.getPageInfo(pageIndex);
+            let pageOffset = this._getImageOffset(pageIndex);
 
             // Ensure the document is drawn to the center of the viewport
-            const viewportPaddingX = Math.max(0, (this._viewport.width - this.layout.dimensions.width) / 2);
-            const viewportPaddingY = Math.max(0, (this._viewport.height - this.layout.dimensions.height) / 2);
+            let viewportPaddingX = Math.max(0, (this._viewport.width - this.layout.dimensions.width) / 2);
+            let viewportPaddingY = Math.max(0, (this._viewport.height - this.layout.dimensions.height) / 2);
 
-            const viewportOffsetX = pageOffset.left - this._viewport.left + viewportPaddingX;
-            const viewportOffsetY = pageOffset.top - this._viewport.top + viewportPaddingY;
+            let viewportOffsetX = pageOffset.left - this._viewport.left + viewportPaddingX;
+            let viewportOffsetY = pageOffset.top - this._viewport.top + viewportPaddingY;
 
-            const destXOffset = viewportOffsetX < 0 ? -viewportOffsetX : 0;
-            const destYOffset = viewportOffsetY < 0 ? -viewportOffsetY : 0;
+            let destXOffset = viewportOffsetX < 0 ? -viewportOffsetX : 0;
+            let destYOffset = viewportOffsetY < 0 ? -viewportOffsetY : 0;
 
-            const canvasX = Math.max(0, viewportOffsetX);
-            const canvasY = Math.max(0, viewportOffsetY);
+            let canvasX = Math.max(0, viewportOffsetX);
+            let canvasY = Math.max(0, viewportOffsetY);
 
-            const destWidth = pageInfo.dimensions.width - destXOffset;
-            const destHeight = pageInfo.dimensions.height - destYOffset;
+            let destWidth = pageInfo.dimensions.width - destXOffset;
+            let destHeight = pageInfo.dimensions.height - destYOffset;
 
             this._ctx.strokeStyle = '#AAA';
             // In order to get a 1px wide line using strokes, we need to start at a 'half pixel'
             this._ctx.strokeRect(canvasX + 0.5, canvasY + 0.5, destWidth, destHeight);
-        }, this);
+        });
     }
 
     // This method should be sent all visible pages at once because it will initiate
@@ -311,17 +300,11 @@ export default class Renderer
                         {
                             this._paint();
                         }
-                        else
-                        {
-                            debugPaints('Page %s, tile %s no longer visible on image load', pageIndex, source.url);
-                        }
                     }
                     else
                     {
                         if (this._isTileForSourceVisible(pageIndex, source))
                             this._paint();
-                        else
-                            debugPaints('Page %s, tile %s no longer visible on image load', pageIndex, source.url);
                     }
                 },
                 error: () =>
@@ -368,41 +351,34 @@ export default class Renderer
 
     _drawTile (pageIndex, scaledTile, img)
     {
-        const tileOffset = this._getTileToDocumentOffset(pageIndex, scaledTile);
+        let tileOffset = this._getTileToDocumentOffset(pageIndex, scaledTile);
 
         // Ensure the document is drawn to the center of the viewport
-        const viewportPaddingX = Math.max(0, (this._viewport.width - this.layout.dimensions.width) / 2);
-        const viewportPaddingY = Math.max(0, (this._viewport.height - this.layout.dimensions.height) / 2);
+        let viewportPaddingX = Math.max(0, (this._viewport.width - this.layout.dimensions.width) / 2);
+        let viewportPaddingY = Math.max(0, (this._viewport.height - this.layout.dimensions.height) / 2);
 
-        const viewportOffsetX = tileOffset.left - this._viewport.left + viewportPaddingX;
-        const viewportOffsetY = tileOffset.top - this._viewport.top + viewportPaddingY;
+        let viewportOffsetX = tileOffset.left - this._viewport.left + viewportPaddingX;
+        let viewportOffsetY = tileOffset.top - this._viewport.top + viewportPaddingY;
 
-        const destXOffset = viewportOffsetX < 0 ? -viewportOffsetX : 0;
-        const destYOffset = viewportOffsetY < 0 ? -viewportOffsetY : 0;
+        let destXOffset = viewportOffsetX < 0 ? -viewportOffsetX : 0;
+        let destYOffset = viewportOffsetY < 0 ? -viewportOffsetY : 0;
 
-        const sourceXOffset = destXOffset / scaledTile.scaleRatio;
-        const sourceYOffset = destYOffset / scaledTile.scaleRatio;
+        let canvasX = Math.max(0, viewportOffsetX);
+        let canvasY = Math.max(0, viewportOffsetY);
 
-        const canvasX = Math.max(0, viewportOffsetX);
-        const canvasY = Math.max(0, viewportOffsetY);
+        let sourceXOffset = destXOffset / scaledTile.scaleRatio;
+        let sourceYOffset = destYOffset / scaledTile.scaleRatio;
 
         // Ensure that the specified dimensions are no greater than the actual
         // size of the image. Safari won't display the tile if they are.
-        const destWidth = Math.min(scaledTile.dimensions.width, img.width * scaledTile.scaleRatio) - destXOffset;
-        const destHeight = Math.min(scaledTile.dimensions.height, img.height * scaledTile.scaleRatio) - destYOffset;
+        let destImgWidth = Math.min(scaledTile.dimensions.width, img.width * scaledTile.scaleRatio) - destXOffset;
+        let destImgHeight = Math.min(scaledTile.dimensions.height, img.height * scaledTile.scaleRatio) - destYOffset;
 
-        const sourceWidth = destWidth / scaledTile.scaleRatio;
-        const sourceHeight = destHeight / scaledTile.scaleRatio;
+        let destWidth = Math.max(1, Math.round(destImgWidth));
+        let destHeight = Math.max(1, Math.round(destImgHeight));
 
-        if (debugPaints.enabled)
-        {
-            debugPaints('Drawing page %s, tile %sx (%s, %s) from %s, %s to viewport at %s, %s, scale %s%%',
-                pageIndex,
-                scaledTile.sourceZoomLevel, scaledTile.row, scaledTile.col,
-                sourceXOffset, sourceYOffset,
-                canvasX, canvasY,
-                Math.round(scaledTile.scaleRatio * 100));
-        }
+        let sourceWidth = destWidth / scaledTile.scaleRatio;
+        let sourceHeight = destHeight / scaledTile.scaleRatio;
 
         this._ctx.drawImage(
             img,
@@ -450,6 +426,7 @@ export default class Renderer
     {
         this._clearAnimation();
         this._goto(pageIndex, verticalOffset, horizontalOffset);
+
         if (this._hooks.onViewDidUpdate)
         {
             this._hooks.onViewDidUpdate(this._renderedPages.slice(), pageIndex);
@@ -462,10 +439,10 @@ export default class Renderer
         const pageOffset = this.layout.getPageOffset(pageIndex);
 
         const desiredVerticalCenter = pageOffset.top + verticalOffset;
-        const top = desiredVerticalCenter - parseInt(this._viewport.height / 2, 10);
+        const top = desiredVerticalCenter - Math.round(this._viewport.height / 2);
 
         const desiredHorizontalCenter = pageOffset.left + horizontalOffset;
-        const left = desiredHorizontalCenter - parseInt(this._viewport.width / 2, 10);
+        const left = desiredHorizontalCenter - Math.round(this._viewport.width / 2);
 
         this._viewport.top = top;
         this._viewport.left = left;
@@ -485,7 +462,6 @@ export default class Renderer
             parameters: options.parameters,
             onUpdate: (values) =>
             {
-                // TODO: Do image preloading, work with that
                 this._setViewportPosition(getPosition(values));
                 this._hooks.onZoomLevelWillChange(values.zoomLevel);
 
@@ -516,11 +492,6 @@ export default class Renderer
             this._animation.cancel();
             this._animation = null;
         }
-    }
-
-    preload ()
-    {
-        // TODO
     }
 
     isPageVisible (pageIndex)

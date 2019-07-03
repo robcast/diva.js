@@ -479,7 +479,8 @@ export default class ViewerCore
             const options = {
                 viewport: this.viewerState.viewport,
                 outerElement: this.viewerState.outerElement,
-                innerElement: this.viewerState.innerElement
+                innerElement: this.viewerState.innerElement,
+                settings: this.settings
             };
 
             const hooks = {
@@ -654,7 +655,7 @@ export default class ViewerCore
         const focalYToCenter = (pageRegion.top + focalPoint.offset.top) -
             (this.settings.viewport.top + (this.settings.viewport.height / 2));
 
-        const getPositionForZoomLevel = function (zoomLevel, initZoom)
+        const getPositionForZoomLevel =  (zoomLevel, initZoom) =>
         {
             const zoomRatio = Math.pow(2, zoomLevel - initZoom);
 
@@ -1093,23 +1094,6 @@ export default class ViewerCore
 
         this.publish('NumberOfPagesDidChange', this.settings.numPages);
 
-        if (this.settings.enableAutoTitle)
-        {
-            let title = document.getElementById(this.settings.selector + 'title');
-
-            if (title)
-            {
-                title.innerHTML = this.settings.manifest.itemTitle;
-            }
-            else
-            {
-                this.settings.parentObject.insertBefore(
-                    elt('div', this.elemAttrs('title'), [this.settings.manifest.itemTitle]),
-                    this.settings.parentObject.firstChild
-                );
-            }
-        }
-
         // Calculate the horizontal and vertical inter-page padding based on the dimensions of the average zoom level
         if (this.settings.adaptivePadding > 0)
         {
@@ -1185,6 +1169,23 @@ export default class ViewerCore
 
         //prep dimensions one last time now that pages have loaded
         this.updatePanelSize();
+
+        if (this.settings.enableAutoTitle)
+        {
+            let title = document.getElementById(this.settings.selector + 'title');
+
+            if (title)
+            {
+                title.innerHTML = this.settings.manifest.itemTitle;
+            }
+            else
+            {
+                this.settings.parentObject.insertBefore(
+                    elt('div', this.elemAttrs('title'), [this.settings.manifest.itemTitle]),
+                    this.settings.parentObject.firstChild
+                );
+            }
+        }
 
         // FIXME: This is a hack to ensure that the outerElement scrollbars are taken into account
         if (this.settings.verticallyOriented)
