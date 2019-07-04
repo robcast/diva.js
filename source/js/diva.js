@@ -153,13 +153,10 @@ class Diva
         }
         else
         {
-            // trigger ManifestWillLoad event
-            diva.Events.publish('ManifestWillLoad', [this.settings], this);
-
         	let requestHeaders =  {
                     "Accept": this.settings.acceptHeader,
             }
-        	if (this.settings.addRequestHeaders != null) 
+        	if (this.settings.addRequestHeaders) 
         	{
         		Object.assign(requestHeaders, this.settings.addRequestHeaders);
         	}
@@ -169,8 +166,8 @@ class Diva
             {
                 if (!response.ok)
                 {
-                    // trigger ManifestDidNotLoad event
-                    diva.Events.publish('ManifestDidNotLoad', [response], this);
+                    // trigger manifest load error event
+                    diva.Events.publish('ManifestFetchError', [response], this);
 
                     this._ajaxError(response);
 

@@ -1,6 +1,20 @@
 import { elt } from '../utils/elt';
+
 /**
- * A simple authentication plugin.
+ * A simple authentication plugin. 
+ * 
+ * Based on parts of IIIF-Auth API but with access control on the manifest. 
+ * 
+ * Requires IIIF-Auth API compliant Access Cookie Service (settings.simpleAuthLoginUrl)
+ * and Access Token Service (settings.simpleAuthTokenUrl).
+ * (see https://iiif.io/api/auth/1.0/)
+ * 
+ * 1. Diva tries to load the manifest normally.
+ * 2. If loading the manifest fails with an authorization error the plugin requests an access token.
+ * 2a. If loading the access token fails the plugin shows a login dialog and requests a new token.
+ * 3. Diva tries to load the manifest with the access token.
+ * 4. If loading the manifest fails with the access token the plugin shows a login dialog and requests a new token.
+ * 5. The images are loaded using the cookies set by the login domain.
  *  
  **/
 export default class SimpleAuthPlugin
@@ -10,95 +24,119 @@ export default class SimpleAuthPlugin
         this.core = core;
         this.toolbarIcon = this.createIcon();
         this.toolbarSide = 'right';
-        this.iiifTokenUrl = core.settings.simpleAuthTokenUrl;
-        this.iiifLoginUrl = core.settings.simpleAuthLoginUrl;
+        this.authTokenUrl = core.settings.simpleAuthTokenUrl;
+        this.authLoginUrl = core.settings.simpleAuthLoginUrl;
         this.authToken = null;
         this.authError = null;
         this.authTokenId = null;
+        this.serviceOrigin = this.getOrigin(this.authTokenUrl);
 
-        Diva.Events.subscribe("ManifestWillLoad", (data) => {
-        	console.debug("ManifestWillLoad", data);
-        	if (this.authTokenId != null && this.authToken == null && this.authError == null) {
-        		console.debug("authentication still in flight!");
+        /*
+         * Manifest load error handler.
+         * 
+         * Re-tries load with auth token or shows log in window. 
+         */
+        Diva.Events.subscribe("ManifestFetchError", (response) => {
+        	if (response.status == 401) {
+            	if (this.authToken == null && this.authError == null) {
+            		// no auth token. let's get one
+            		this.requestAuthToken();
+            		// abort regular error message
+            		throw new Error("cancel error handler");
+            	} else {
+            		// auth token doesn't work. try to log in again
+            		this.showLoginMessage(response);
+            		// abort regular error message
+            		throw new Error("cancel error handler");
+            	}
         	}
         }, core.settings.ID);
-
-        Diva.Events.subscribe("ManifestDidNotLoad", (response) => {
-        	console.debug("ManifestDidNotLoad", response);
-        	if (response.status == 401) {
-            	if (this.authTokenId != null && this.authToken == null && this.authError == null) {
-            		console.debug("authentication still in flight. Let's wait...");
-            		throw "error";
-            	}
-            	if (this.authToken != null && this.authError == null) {
-            		console.debug("authentication is ok let's wait...");
-            		throw "error";
-            	}        		
-        		console.debug("need to authenticate!");
-        		this._ajaxError(response);
-        		//this.handleClick();
-        	}        	
-        }, core.settings.ID);
         
-        // add postMessage event handler for IIIF token service
-        window.addEventListener("message", this.receiveMessageHandler(core.settings));
-        // get a token now
-        this.requestAuthToken();
+        /*
+         * postMessage event handler.
+         * 
+         * Receives data from IIIF-Auth token service in iframe.
+         * (https://iiif.io/api/auth/1.0/#interaction-for-browser-based-client-applications)
+         */
+        window.addEventListener("message", (event) => {
+            let origin = event.origin;
+            let data = event.data;
+            //console.debug("received postMessage!", origin, data);
+            
+            if (origin != this.serviceOrigin) return;
+            
+            if (data.messageId != this.authTokenId) return;
+            
+            if (data.hasOwnProperty('accessToken')) 
+            {
+            	this.authToken = data.accessToken;
+                this.authError = null;
+                this.setAuthHeader(data.accessToken);
+                // reload manifest
+                this.core.publicInstance._loadOrFetchObjectData();
+            } 
+            else if (data.hasOwnProperty('error')) 
+            {
+                // handle error condition
+            	console.debug("ERROR getting access token!");
+            	this.authError = data.error;
+            	this.authToken = null;
+            	this.setAuthHeader(null);
+            	// reload manifest to trigger login window
+                this.core.publicInstance._loadOrFetchObjectData();
+            }
+        });
     }
 
-    onManifestWillLoad (data) 
+    /**
+     * Show login required message with button to open login window.
+     */
+    showLoginMessage (response)
     {
-    	console.debug("ManifestWillLoad", data);
-    }
-    
-    onManifestDidNotLoad (response) 
-    {
-    }
-    
-    _ajaxError (response)
-    {
-        // Show a basic error message within the document viewer pane
         const errorMessage = ['Unauthorized request. Error code: ' + response.status + ' ' + response.statusText];
         errorMessage.push(
-                elt('p', 'The document you are trying to access requires authentication.'),
-                elt('p', 'Please try to ',
-                	elt('button', this.core.elemAttrs('error-auth-login', {'aria-label': 'Close dialog'}), 'login')
-        		));
-
+            elt('p', 'The document you are trying to access requires authentication.'),
+            elt('p', 'Please ',
+            	elt('button', this.core.elemAttrs('error-auth-login', {'aria-label': 'Log in'}), 'log in')
+    		));
+        
         this.core.showError(errorMessage);
-        document.querySelector('#' + this.core.settings.selector + 'error-auth-login').addEventListener('click', () =>
+        
+        // connect login button
+        let selector = '#' + this.core.settings.selector;
+        document.querySelector(selector + 'error-auth-login').addEventListener('click', () =>
         {
-            this.handleClick();
+            this.openLoginWindow();
+            // close error message
+            let errorElement =  document.querySelector(selector + 'error');
+            errorElement.parentNode.removeChild(errorElement);
         });
-        throw "error";
     }
 
-    
     /**
-     * Open a new window with the login screen if necessary.
-     *
-     **/
-    handleClick ()
+     * Open new window with login url and re-request token after it closes.
+     */
+    openLoginWindow () 
     {
-    	if (this.authToken == null || this.authError != null)
-    	{
-    		let loginWindow = window.open(this.iiifLoginUrl);
-    		if (loginWindow == null) {
-    			console.debug("login window did not open :-(");
-    			return;
-    		}
-            // we need to wait for the window to close...
-            let poll = window.setInterval( () => {
-                if (loginWindow.closed) {
-                    console.debug("login service window is now closed");
-                    window.clearInterval(poll);
-                    this.requestAuthToken();
-                    // TODO: reload when token resolved...
-                }
-            }, 500);
-    	}
+		const loginWindow = window.open(this.authLoginUrl);
+		
+		if (loginWindow == null) 
+		{
+			console.error("login service window did not open :-(");
+			return;
+		}
+		
+        // we need to wait for the window to close...
+        const poll = window.setInterval( () => {
+            if (loginWindow.closed) 
+            {
+                window.clearInterval(poll);
+                // request a token with the new cookies
+                this.requestAuthToken();
+            }
+        }, 500);
     }
-
+    
     /**
      * Request a new authentication token.
      * 
@@ -113,14 +151,16 @@ export default class SimpleAuthPlugin
         {
         	tokenFrame = document.createElement('iframe');
         	tokenFrame.id = tokenFrameId;
-            tokenFrame.setAttribute('style', 'display:none; width:300px; height:100px;');
+            tokenFrame.setAttribute('style', 'display:none; width:30px; height:10px;');
             document.body.appendChild(tokenFrame);
         }
 
+        // use utime as token id
         this.authTokenId = Date.now();
-        let tokenUrl = this.iiifTokenUrl + "?messageId=" + this.authTokenId + "&origin=" + this.getOrigin();
+        // create url with id and origin
+        const tokenUrl = this.authTokenUrl + "?messageId=" + this.authTokenId + "&origin=" + this.getOrigin();
+        // load url in iframe
         tokenFrame.src = tokenUrl;
-        console.debug("set token frame to "+tokenUrl);
     }
 
     /**
@@ -138,60 +178,32 @@ export default class SimpleAuthPlugin
     }
     
     /**
-     * Return handler function for postMessage.
-     * 
-     * The handler checks the message and updates the access token.
+     * Set the Authorization header.
      */
-    receiveMessageHandler (settings) 
+    setAuthHeader (token) 
     {
-        let serviceOrigin = this.getOrigin(this.iiifTokenUrl);
-        
-    	return  (event) => {
-            let origin = event.origin;
-            let data = event.data;
-            console.debug("received postMessage!", origin, data);
-            
-            if (origin != serviceOrigin) return;
-            
-            if (data.messageId != this.authTokenId) return;
-            
-            if (data.hasOwnProperty('accessToken')) 
-            {
-                this.setAccessToken(data.accessToken);
-                this.authError = null;
-                console.debug("reload viewer!");
-                this.core.publicInstance._loadOrFetchObjectData();
-            } 
-            else if (data.hasOwnProperty('error')) 
-            {
-                // handle error condition
-            	console.debug("ERROR getting access token!");
-            	this.setAccessToken(null);
-            	this.authError = data.error;
-            }
-        }
-    }
-
-    /**
-     * Set the access token.
-     * 
-     * Updates the Authorization in the request header.
-     */
-    setAccessToken (token) 
-    {
-    	this.authToken = token;
     	if (token != null)
     	{
-    		this.core.settings.addRequestHeaders = {
-    			"Authorization": "Bearer " + token
-    		};
+    		this.core.settings.addRequestHeaders = this.core.settings.addRequestHeaders || {};
+    		this.core.settings.addRequestHeaders["Authorization"] = "Bearer " + token;
     	}
-    	else
+    	else if (this.core.settings.addRequestHeaders != null)
 		{
-    		this.core.settings.addRequestHeaders = null;
+    		delete this.core.settings.addRequestHeaders["Authorization"];
 		}
     }
     
+    /**
+     * Clicking the icon opens a login window if necessary.
+     **/
+    handleClick ()
+    {
+    	if (this.authToken == null || this.authError != null)
+    	{
+    		this.openLoginWindow();
+    	}
+    }
+
     createIcon ()
     {
         /*

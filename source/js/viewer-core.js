@@ -235,8 +235,6 @@ export default class ViewerCore
         this.boundScrollFunction = this.scrollFunction.bind(this);
         this.boundEscapeListener = this.escapeListener.bind(this);
 
-        this.events = diva.Events; // ROC
-        
         // Do all the plugin initialisation
         this.initPlugins();
         this.handleEvents();
