@@ -1181,7 +1181,7 @@ class Diva
      * */
     gotoPageByIndex (pageIndex, xAnchor, yAnchor)
     {
-        this._gotoPageByIndex(pageIndex, xAnchor, yAnchor);
+        return this._gotoPageByIndex(pageIndex, xAnchor, yAnchor);
     }
 
     /**
